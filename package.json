@@ -1,21 +1,21 @@
 {
   "name": "fatigue-detection-data-collector",
   "displayName": "fatigue-detection-data-collector",
-  "description": "",
+  "description": "Collects IDE activity data (active/idle/file switches) for fatigue detection.",
   "version": "0.0.1",
   "engines": {
     "vscode": "^1.103.0"
   },
-  "categories": [
-    "Other"
+  "activationEvents": [
+    "onStartupFinished",
+    "onCommand:fatigueDetectionDataCollector.showStats"
   ],
-  "activationEvents": [],
   "main": "./out/extension.js",
   "contributes": {
     "commands": [
       {
-        "command": "fatigue-detection-data-collector.helloWorld",
-        "title": "Hello World"
+        "command": "fatigueDetectionDataCollector.showStats",
+        "title": "Fatigue Detection: Show Stats"
       }
     ]
   },
@@ -23,9 +23,8 @@
     "vscode:prepublish": "npm run compile",
     "compile": "tsc -p ./",
     "watch": "tsc -watch -p ./",
-    "pretest": "npm run compile && npm run lint",
-    "lint": "eslint src",
-    "test": "vscode-test"
+    "pretest": "npm run compile",
+    "test": "node ./out/test/runTest.js"
   },
   "devDependencies": {
     "@types/vscode": "^1.103.0",
@@ -36,6 +35,7 @@
     "eslint": "^9.32.0",
     "typescript": "^5.9.2",
     "@vscode/test-cli": "^0.0.11",
-    "@vscode/test-electron": "^2.5.2"
+    "@vscode/test-electron": "^2.5.2",
+    "@types/glob": "^7.2.0"
   }
 }

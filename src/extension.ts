@@ -1,26 +1,64 @@
-// The module 'vscode' contains the VS Code extensibility API
-// Import the module and reference it with the alias vscode in your code below
 import * as vscode from 'vscode';
 
-// This method is called when your extension is activated
-// Your extension is activated the very first time the command is executed
 export function activate(context: vscode.ExtensionContext) {
+  console.log('Fatigue Detection Data Collector is now active!');
 
-	// Use the console to output diagnostic information (console.log) and errors (console.error)
-	// This line of code will only be executed once when your extension is activated
-	console.log('Congratulations, your extension "fatigue-detection-data-collector" is now active!');
+  let sessionStart = new Date();
+  let fileSwitchCount = 0;
+  let activeSeconds = 0;
+  let idleSeconds = 0;
 
-	// The command has been defined in the package.json file
-	// Now provide the implementation of the command with registerCommand
-	// The commandId parameter must match the command field in package.json
-	const disposable = vscode.commands.registerCommand('fatigue-detection-data-collector.helloWorld', () => {
-		// The code you place here will be executed every time your command is executed
-		// Display a message box to the user
-		vscode.window.showInformationMessage('Hello World from fatigue-detection-data-collector!');
-	});
+  let lastActivityAt = Date.now();
+  const idleTimeoutMs = 60 * 1000; // 1 minute
+  let prevEditor = vscode.window.activeTextEditor?.document?.uri.toString() ?? '';
 
-	context.subscriptions.push(disposable);
+  // Timer: count active vs idle seconds
+  const timer = setInterval(() => {
+    const now = Date.now();
+    if (now - lastActivityAt <= idleTimeoutMs) {
+      activeSeconds++;
+    } else {
+      idleSeconds++;
+    }
+  }, 1000);
+
+  // Register events as "activity"
+  const markActivity = () => { lastActivityAt = Date.now(); };
+
+  context.subscriptions.push(
+    vscode.workspace.onDidChangeTextDocument(markActivity),
+    vscode.window.onDidChangeTextEditorSelection(markActivity),
+    vscode.workspace.onDidOpenTextDocument(markActivity),
+    vscode.workspace.onDidSaveTextDocument(markActivity),
+    vscode.window.onDidChangeActiveTextEditor(editor => {
+      markActivity();
+      const current = editor?.document?.uri.toString() ?? '';
+      if (current && current !== prevEditor) {
+        fileSwitchCount++;
+        prevEditor = current;
+      }
+    })
+  );
+
+  // Command to show collected stats
+  const disposable = vscode.commands.registerCommand('fatigueDetectionDataCollector.showStats', () => {
+    const now = new Date();
+    const duration = ((now.getTime() - sessionStart.getTime()) / 1000 / 60).toFixed(1);
+
+    vscode.window.showInformationMessage(
+      `Session length: ${duration} min | Active: ${activeSeconds}s | Idle: ${idleSeconds}s | File switches: ${fileSwitchCount}`
+    );
+  });
+
+  context.subscriptions.push(disposable);
+
+  // Cleanup on deactivate
+  context.subscriptions.push({
+    dispose: () => {
+      clearInterval(timer);
+      console.log('Fatigue Detection Data Collector session ended.');
+    }
+  });
 }
 
-// This method is called when your extension is deactivated
 export function deactivate() {}
