@@ -1,71 +1,39 @@
-# fatigue-detection-data-collector README
+# Fatigue Detection Data Collector
 
-This is the README for your extension "fatigue-detection-data-collector". After writing up a brief description, we recommend including the following sections.
+This VS Code extension is designed to passively collect data on a user's coding activity to help researchers and developers better understand patterns of work and potential developer fatigue. It operates in the background, tracking key metrics during your coding sessions.
 
 ## Features
 
-Describe specific features of your extension including screenshots of your extension in action. Image paths are relative to this README file.
+- **Automatic Data Collection**: The extension automatically starts collecting data when a VS Code window is opened.
+- **Activity and Idle Time Tracking**: It distinguishes between active typing/editing time and periods of inactivity (idle time).
+- **File Switch Counting**: The extension keeps a running count of how many times you switch between different files.
+- **Session-Based Logging**: When the VS Code window is closed, it records the session's total active time, idle time, and file switches into a log file.
+- **Data Location**: All data is saved locally to a `sessions.jsonl` file in the `C:\fatigue-detection-data-collector` directory. Each line in the file is a separate JSON object representing a single coding session.
 
-For example if there is an image subfolder under your extension project workspace:
-
-\!\[feature X\]\(images/feature-x.png\)
-
-> Tip: Many popular extensions utilize animations. This is an excellent way to show off your extension! We recommend short, focused animations that are easy to follow.
+### What is collected?
+The extension collects and stores the following data for each session:
+- `session_start_time`: The timestamp when the session began.
+- `session_end_time`: The timestamp when the session ended.
+- `active_seconds`: The total number of seconds the user was actively coding.
+- `idle_seconds`: The total number of seconds the user was idle.
+- `file_switch_count`: The number of times the user switched to a new file.
 
 ## Requirements
 
-If you have any requirements or dependencies, add a section describing those and how to install and configure them.
+This extension has no external dependencies. It is built using the standard VS Code API and Node.js file system modules which are included with VS Code.
 
 ## Extension Settings
 
-Include if your extension adds any VS Code settings through the `contributes.configuration` extension point.
-
-For example:
-
-This extension contributes the following settings:
-
-* `myExtension.enable`: Enable/disable this extension.
-* `myExtension.thing`: Set to `blah` to do something.
+This extension does not contribute any user-configurable settings through the `contributes.configuration` point. Its behavior is fixed and designed for automated data collection.
 
 ## Known Issues
 
-Calling out known issues can help limit users opening duplicate issues against your extension.
+Currently, there are no known issues. If you encounter any problems, please open an issue on the project's repository.
 
 ## Release Notes
 
-Users appreciate release notes as you update your extension.
-
 ### 1.0.0
-
-Initial release of ...
-
-### 1.0.1
-
-Fixed issue #.
-
-### 1.1.0
-
-Added features X, Y, and Z.
-
----
-
-## Following extension guidelines
-
-Ensure that you've read through the extensions guidelines and follow the best practices for creating your extension.
-
-* [Extension Guidelines](https://code.visualstudio.com/api/references/extension-guidelines)
-
-## Working with Markdown
-
-You can author your README using Visual Studio Code. Here are some useful editor keyboard shortcuts:
-
-* Split the editor (`Cmd+\` on macOS or `Ctrl+\` on Windows and Linux).
-* Toggle preview (`Shift+Cmd+V` on macOS or `Shift+Ctrl+V` on Windows and Linux).
-* Press `Ctrl+Space` (Windows, Linux, macOS) to see a list of Markdown snippets.
-
-## For more information
-
-* [Visual Studio Code's Markdown Support](http://code.visualstudio.com/docs/languages/markdown)
-* [Markdown Syntax Reference](https://help.github.com/articles/markdown-basics/)
-
-**Enjoy!**
+Initial release of the Fatigue Detection Data Collector.
+- Implemented core logic for tracking active time, idle time, and file switches.
+- Added session-based data logging to a local JSON Lines file.
+- Included a command `fatigueDetectionDataCollector.showStats` for viewing current session metrics.
