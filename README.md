@@ -22,6 +22,18 @@ The extension collects and stores the following data for each session:
 
 This extension has no external dependencies. It is built using the standard VS Code API and Node.js file system modules which are included with VS Code.
 
+## Build and test
+
+Each time you make changes, run:
+```
+npm run compile
+```
+Or enable auto-compile by running:
+```
+npm run watch
+```
+Then press F5 in VS Code to launch and test the extension.
+
 ## Extension Settings
 
 This extension does not contribute any user-configurable settings through the `contributes.configuration` point. Its behavior is fixed and designed for automated data collection.

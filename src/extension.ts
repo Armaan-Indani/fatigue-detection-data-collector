@@ -2,6 +2,7 @@ import * as vscode from "vscode";
 import * as fs from "fs";
 import * as path from "path";
 import axios from "axios";
+import { log, error as logError } from "./logger";
 
 let sessionStart: Date;
 let fileSwitchCount: number;
@@ -20,7 +21,7 @@ type SessionRecord = {
 };
 
 export function activate(context: vscode.ExtensionContext) {
-  console.log("Fatigue Detection Data Collector is now active!");
+  log("Fatigue Detection Data Collector is now active!");
 
   extensionContext = context;
   sessionStart = new Date();
@@ -109,7 +110,7 @@ export async function deactivate(): Promise<void> {
   };
 
   fs.appendFileSync(outFile, JSON.stringify(record) + "\n", "utf8");
-  console.log(`Session saved to ${outFile}`);
+  log(`Session saved to ${outFile}`);
 
   const pluginVersion = extensionContext.extension.packageJSON.version;
   const taskId = "c85f41e4-7ce2-4027-aebf-92efdbf1e020";
@@ -127,14 +128,24 @@ export async function deactivate(): Promise<void> {
 
   try {
     const response = await axios.post(url, payload);
-    console.log("Data sent successfully:", response.data);
+    log("Data sent successfully:", response.data);
   } catch (error: any) {
-    console.error("Error sending data:", error);
-    const errorLogPath = "C:/fatigue-detection-data-collector/error.log";
-    fs.appendFileSync(
-      errorLogPath,
-      `[${new Date().toISOString()}] Error sending data: ${error}\n`,
-      "utf8"
+    logError("Error sending data:", error);
+    const errorLogPath = path.join(
+      "D:\\fatigue-detection-data-collector\\logs",
+      "error.log"
     );
+    try {
+      fs.appendFileSync(
+        errorLogPath,
+        `[${new Date().toISOString()}] Error sending data: ${error}\n`,
+        "utf8"
+      );
+    } catch (e) {
+      logError("Failed to write error log to disk. Original send error:", error);
+      logError("Filesystem append error:", e);
+      console.error("Failed to write error log to disk:", e, "Original send error:", error);
+      // ignore write failures
+    }
   }
 }
