@@ -4,9 +4,20 @@ import * as path from "path";
 import axios from "axios";
 import { execSync } from "child_process";
 import { log, error as logError } from "./logger";
+import * as dotenv from "dotenv";
 
-const USER_ID = "e4669eb0-ef12-4be8-81ac-60d14cf3a718";
-const BACKEND_URL = "https://webserver-21719250255.asia-south1.run.app";
+dotenv.config();
+
+const USER_ID = process.env.USER_ID ?? "e4669eb0-ef12-4be8-81ac-60d14cf3a718";
+const BACKEND_URL =
+  process.env.BACKEND_URL ??
+  "https://webserver-21719250255.asia-south1.run.app";
+
+if (!process.env.USER_ID || !process.env.BACKEND_URL) {
+  log(
+    "Using default USER_ID/BACKEND_URL; set them in a .env file to override."
+  );
+}
 
 let sessionStart: Date;
 let fileSwitchCount: number;
