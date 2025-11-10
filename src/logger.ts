@@ -11,7 +11,7 @@ if (!fs.existsSync(LOG_DIR)) {
 }
 
 const LOG_FILE = path.join(LOG_DIR, "extension.log");
-const ERROR_LOG_FILE = path.join(LOG_DIR, "extension-error.log");
+const ERROR_LOG_FILE = path.join(LOG_DIR, "extension.log");
 
 function formatArgs(args: any[]) {
   return args
@@ -45,11 +45,11 @@ export function log(...args: any[]) {
 
 export function error(...args: any[]) {
   try {
-    fs.appendFileSync(ERROR_LOG_FILE, line(...args), "utf8");
+    fs.appendFileSync(ERROR_LOG_FILE, "ERROR: " + line(...args), "utf8");
   } catch (e) {
     try {
       // fallback to main log
-      fs.appendFileSync(LOG_FILE, line(...args), "utf8");
+      fs.appendFileSync(LOG_FILE, "ERROR: " + line(...args), "utf8");
     } catch (e) {
       // give up
     }
