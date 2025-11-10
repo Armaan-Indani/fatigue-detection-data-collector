@@ -19,6 +19,8 @@ if (!process.env.USER_ID || !process.env.BACKEND_URL) {
   );
 }
 
+let TASK_ID: string | null = null;
+
 let sessionStart: Date;
 let fileSwitchCount: number;
 let activeSeconds: number;
@@ -28,7 +30,6 @@ let outFile: string;
 let extensionContext: vscode.ExtensionContext;
 
 let currentCommitHash: string | null = null;
-let currentTaskId: string | null = null;
 
 type SessionRecord = {
   session_start_time: string;
@@ -36,6 +37,7 @@ type SessionRecord = {
   active_minutes: number;
   idle_seconds: number;
   file_switches: number;
+  prev_commit_hash: string;
 };
 
 function getLatestCommitHash(): string | null {
@@ -55,51 +57,72 @@ function getLatestCommitHash(): string | null {
   }
 }
 
-async function createTaskForCommit(commitHash: string): Promise<string | null> {
-  const baseUrl = `${BACKEND_URL}/api/v1/tasks`;
-  const getTaskUrl = `${baseUrl}/getTaskID`;
-
+async function fetchLatestTaskId(): Promise<string | null> {
   try {
-    // Step 1: Check if task already exists
-    const payload = { prev_commit_hash: commitHash };
-    const existing = await axios.post(getTaskUrl, payload);
-
-    log(existing.data);
-
-    if (existing.data && existing.data.task_id) {
-      log("Task already exists for commit:", commitHash);
-      return existing.data.task_id;
+    const url = `${BACKEND_URL}/api/v1/tasks/getLatestTask/${USER_ID}`;
+    const response = await axios.get(url);
+    if (response.data && response.data.task_id) {
+      log(`Fetched latest task ID: ${response.data.task_id}`);
+      return response.data.task_id;
     }
-  } catch (err) {
-    logError("Failed to check existing task for commit:", err);
-  }
-
-  const payload = {
-    user_id: USER_ID,
-    title: `Task for commit ${commitHash}`,
-    description: "Auto-created from VS Code commit event",
-    prev_commit_hash: commitHash,
-  };
-
-  try {
-    // Step 2: Create new task
-    const response = await axios.post(baseUrl, payload);
-    log("Created new task for commit:", commitHash);
-    return response.data.ID;
-  } catch (err) {
-    logError("Failed to create task for commit:", err);
+    log("No latest task found for this user.");
+    return null;
+  } catch (error) {
+    logError("Failed to fetch latest task:", error);
     return null;
   }
 }
 
-export function activate(context: vscode.ExtensionContext) {
-  log("Fatigue Detection Data Collector is now active!");
+async function createNewTask(title: string): Promise<string | null> {
+  try {
+    const url = `${BACKEND_URL}/api/v1/tasks`;
+    const payload = {
+      user_id: USER_ID,
+      title,
+      description: "Task created manually from VS Code",
+    };
+    const response = await axios.post(url, payload);
+    if (response.data && response.data.ID) {
+      log(`Created new task: ${response.data.ID}`);
+      return response.data.ID;
+    }
+    return null;
+  } catch (error) {
+    logError("Failed to create new task:", error);
+    return null;
+  }
+}
 
-  extensionContext = context;
+function startNewSession() {
   sessionStart = new Date();
   fileSwitchCount = 0;
   activeSeconds = 0;
   idleSeconds = 0;
+  log(`New session started at ${sessionStart.toISOString()}`);
+}
+
+export async function activate(context: vscode.ExtensionContext) {
+  log("Fatigue Detection Data Collector is now active!");
+
+  extensionContext = context;
+
+  TASK_ID = await fetchLatestTaskId();
+  if (!TASK_ID) {
+    log("No existing task found.");
+
+    const create = await vscode.window.showInformationMessage(
+      "No existing task found. Create one now?",
+      "Yes",
+      "No"
+    );
+    if (create === "Yes") {
+      vscode.commands.executeCommand(
+        "fatigueDetectionDataCollector.createNewTask"
+      );
+    }
+  }
+
+  startNewSession();
 
   let lastActivityAt = Date.now();
   const idleTimeoutMs = 15 * 1000; // 15 seconds
@@ -161,7 +184,30 @@ export function activate(context: vscode.ExtensionContext) {
   );
   context.subscriptions.push(disposable);
 
-  // Watch for new commits and create tasks automatically
+  // --- Command to create a new task manually ---
+  const createTaskCommand = vscode.commands.registerCommand(
+    "fatigueDetectionDataCollector.createNewTask",
+    async () => {
+      const title = await vscode.window.showInputBox({
+        prompt: "Enter a name for the new task",
+        placeHolder: "e.g. Refactor authentication module",
+      });
+      if (title) {
+        const newTaskId = await createNewTask(title);
+        if (newTaskId) {
+          TASK_ID = newTaskId;
+          vscode.window.showInformationMessage(
+            `New task created. Active task ID: ${TASK_ID}`
+          );
+        } else {
+          vscode.window.showErrorMessage("Failed to create new task.");
+        }
+      }
+    }
+  );
+  context.subscriptions.push(createTaskCommand);
+
+  // --- Git commit monitoring ---
   const workspaceFolders = vscode.workspace.workspaceFolders;
   if (workspaceFolders && workspaceFolders.length > 0) {
     const repoPath = workspaceFolders[0].uri.fsPath;
@@ -170,20 +216,14 @@ export function activate(context: vscode.ExtensionContext) {
     if (fs.existsSync(gitHeadPath)) {
       // Get current commit hash at startup
       currentCommitHash = getLatestCommitHash();
-      if (currentCommitHash) {
-        log(`Initial commit detected.`);
-        createTaskForCommit(currentCommitHash).then((taskId) => {
-          currentTaskId = taskId;
-        });
-      }
+      log(`Session started with task_id: ${TASK_ID}`);
 
-      // Watch for commit changes
       fs.watchFile(gitHeadPath, async () => {
         const latestCommit = getLatestCommitHash();
         if (latestCommit && latestCommit !== currentCommitHash) {
           currentCommitHash = latestCommit;
-          currentTaskId = await createTaskForCommit(latestCommit);
-          log(`New commit detected.`);
+          log(`Commit detected. Ending current session and starting new one.`);
+          await endAndRestartSession();
         }
       });
     } else {
@@ -208,13 +248,14 @@ export async function deactivate(): Promise<void> {
     active_minutes: activeSeconds / 60,
     idle_seconds: idleSeconds,
     file_switches: fileSwitchCount,
+    prev_commit_hash: getLatestCommitHash() || "N/A",
   };
 
   fs.appendFileSync(outFile, JSON.stringify(record) + "\n", "utf8");
   log(`Session saved to ${outFile}`);
 
   const pluginVersion = extensionContext.extension.packageJSON.version;
-  const taskId = currentTaskId || getLatestCommitHash() || "unknown-commit";
+  const taskId = TASK_ID ?? "unknown-task";
   const clientTs = new Date().toISOString();
 
   const payload = {
@@ -255,4 +296,10 @@ export async function deactivate(): Promise<void> {
       );
     }
   }
+}
+
+async function endAndRestartSession(): Promise<void> {
+  await deactivate();
+  await new Promise((r) => setTimeout(r, 100));
+  startNewSession();
 }

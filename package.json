@@ -18,7 +18,13 @@
     "commands": [
       {
         "command": "fatigueDetectionDataCollector.showStats",
-        "title": "Fatigue Detection: Show Stats"
+        "title": "Fatigue Detection: Show Stats",
+        "category": "Fatigue Detection"
+      },
+      {
+        "command": "fatigueDetectionDataCollector.createNewTask",
+        "title": "Fatigue Detection: Create New Task",
+        "category": "Fatigue Detection"
       }
     ]
   },
