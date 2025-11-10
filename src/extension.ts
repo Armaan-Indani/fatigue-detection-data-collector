@@ -26,7 +26,7 @@ let fileSwitchCount: number;
 let activeSeconds: number;
 let idleSeconds: number;
 let timer: NodeJS.Timeout;
-let outFile: string;
+// let outFile: string;
 let extensionContext: vscode.ExtensionContext;
 
 let currentCommitHash: string | null = null;
@@ -129,12 +129,12 @@ export async function activate(context: vscode.ExtensionContext) {
   let prevEditor =
     vscode.window.activeTextEditor?.document?.uri.toString() ?? "";
 
-  // Ensure storage directory exists
-  const outDir = "C:/fatigue-detection-data-collector";
-  if (!fs.existsSync(outDir)) {
-    fs.mkdirSync(outDir, { recursive: true });
-  }
-  outFile = path.join(outDir, "sessions.jsonl");
+  // // Ensure storage directory exists
+  // const outDir = "C:/fatigue-detection-data-collector";
+  // if (!fs.existsSync(outDir)) {
+  //   fs.mkdirSync(outDir, { recursive: true });
+  // }
+  // outFile = path.join(outDir, "sessions.jsonl");
 
   // Timer: count active vs idle seconds
   timer = setInterval(() => {
@@ -251,8 +251,8 @@ export async function deactivate(): Promise<void> {
     prev_commit_hash: getLatestCommitHash() || "N/A",
   };
 
-  fs.appendFileSync(outFile, JSON.stringify(record) + "\n", "utf8");
-  log(`Session saved to ${outFile}`);
+  // fs.appendFileSync(outFile, JSON.stringify(record) + "\n", "utf8");
+  // log(`Session saved to ${outFile}`);
 
   const pluginVersion = extensionContext.extension.packageJSON.version;
   const taskId = TASK_ID ?? "unknown-task";
