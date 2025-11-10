@@ -57,6 +57,60 @@ function getLatestCommitHash(): string | null {
   }
 }
 
+async function processGitDiff(repoPath: string) {
+  try {
+    const diff = execSync("git diff HEAD~1 HEAD", { cwd: repoPath })
+      .toString()
+      .trim();
+    if (!diff) {
+      log("No diff found between last two commits.");
+      return;
+    }
+
+    // Create folder for diffs
+    const diffsDir = path.join(repoPath, "github-diffs");
+    if (!fs.existsSync(diffsDir)) {
+      fs.mkdirSync(diffsDir, { recursive: true });
+    }
+
+    // Split diff into per-file sections
+    const diffBlocks = diff.split(/^diff --git /m).filter(Boolean);
+    for (const block of diffBlocks) {
+      const lines = block.split("\n");
+      const firstLine = lines[0];
+      const match = firstLine.match(/^a\/(.+?) b\/(.+)$/);
+      const fileName = match ? match[2] : "unknown";
+
+      // Keep only added/modified lines (those starting with '+', excluding headers)
+      const addedLines = lines
+        .filter(
+          (line) =>
+            line.startsWith("+") &&
+            !line.startsWith("+++ ") && // skip metadata
+            !line.startsWith("+++") // redundant guard
+        )
+        .map((line) => line.slice(1)) // remove '+'
+        .join("\n");
+
+      const safeName = fileName.replace(/[\\/:"*?<>|]+/g, "_");
+      const diffFilePath = path.join(diffsDir, `${safeName}-diff.txt`);
+      fs.writeFileSync(diffFilePath, addedLines, "utf8");
+      log(`Saved added/modified lines for ${fileName} to ${diffFilePath}`);
+    }
+
+    // Still send full diff to API
+    const apiUrl = `${BACKEND_URL}/api/v1/ai-detection`;
+    const response = await axios.post(apiUrl, {
+      user_id: USER_ID,
+      commit_diff: diff,
+    });
+
+    log(`AI detection result: ${JSON.stringify(response.data)}`);
+  } catch (err) {
+    logError("Failed to process Git diff:", err);
+  }
+}
+
 async function fetchLatestTaskId(): Promise<string | null> {
   try {
     const url = `${BACKEND_URL}/api/v1/tasks/getLatestTask/${USER_ID}`;
@@ -128,13 +182,6 @@ export async function activate(context: vscode.ExtensionContext) {
   const idleTimeoutMs = 15 * 1000; // 15 seconds
   let prevEditor =
     vscode.window.activeTextEditor?.document?.uri.toString() ?? "";
-
-  // // Ensure storage directory exists
-  // const outDir = "C:/fatigue-detection-data-collector";
-  // if (!fs.existsSync(outDir)) {
-  //   fs.mkdirSync(outDir, { recursive: true });
-  // }
-  // outFile = path.join(outDir, "sessions.jsonl");
 
   // Timer: count active vs idle seconds
   timer = setInterval(() => {
@@ -211,18 +258,32 @@ export async function activate(context: vscode.ExtensionContext) {
   const workspaceFolders = vscode.workspace.workspaceFolders;
   if (workspaceFolders && workspaceFolders.length > 0) {
     const repoPath = workspaceFolders[0].uri.fsPath;
-    const gitHeadPath = path.join(repoPath, ".git", "HEAD");
+    const gitDir = path.join(repoPath, ".git");
+    const headFile = path.join(gitDir, "HEAD");
 
-    if (fs.existsSync(gitHeadPath)) {
-      // Get current commit hash at startup
+    if (fs.existsSync(headFile)) {
+      const headContent = fs.readFileSync(headFile, "utf8").trim();
+
+      // Example of headContent: "ref: refs/heads/main"
+      let refPath: string;
+      if (headContent.startsWith("ref:")) {
+        refPath = path.join(gitDir, headContent.replace("ref: ", "").trim());
+      } else {
+        refPath = headFile;
+      }
+
       currentCommitHash = getLatestCommitHash();
       log(`Session started with task_id: ${TASK_ID}`);
 
-      fs.watchFile(gitHeadPath, async () => {
+      fs.watch(refPath, async () => {
         const latestCommit = getLatestCommitHash();
         if (latestCommit && latestCommit !== currentCommitHash) {
+          log(`New commit detected: ${latestCommit}`);
           currentCommitHash = latestCommit;
-          log(`Commit detected. Ending current session and starting new one.`);
+
+          await processGitDiff(repoPath);
+          log(`Processed diff and restarting session...`);
+
           await endAndRestartSession();
         }
       });
