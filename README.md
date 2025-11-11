@@ -1,51 +1,111 @@
 # Fatigue Detection Data Collector
 
-This VS Code extension is designed to passively collect data on a user's coding activity to help researchers and developers better understand patterns of work and potential developer fatigue. It operates in the background, tracking key metrics during your coding sessions.
+A small VS Code extension that collects lightweight IDE activity signals (active vs idle time, file switches, and Git-related diffs) to help research and tooling for detecting developer fatigue or coding patterns.
 
-## Features
+This README documents how to build, run, and configure the extension. It also clarifies where data and logs are written and what is sent to the backend API.
 
-- **Automatic Data Collection**: The extension automatically starts collecting data when a VS Code window is opened.
-- **Activity and Idle Time Tracking**: It distinguishes between active typing/editing time and periods of inactivity (idle time).
-- **File Switch Counting**: The extension keeps a running count of how many times you switch between different files.
-- **Session-Based Logging**: When the VS Code window is closed, it records the session's total active time, idle time, and file switches into a log file.
-- **Data Location**: All data is saved locally to a `sessions.jsonl` file in the `C:\fatigue-detection-data-collector` directory. Each line in the file is a separate JSON object representing a single coding session.
+## Key features
 
-### What is collected?
-The extension collects and stores the following data for each session:
-- `session_start_time`: The timestamp when the session began.
-- `session_end_time`: The timestamp when the session ended.
-- `active_seconds`: The total number of seconds the user was actively coding.
-- `idle_seconds`: The total number of seconds the user was idle.
-- `file_switch_count`: The number of times the user switched to a new file.
+- Automatic session tracking on VS Code startup (activation event: `onStartupFinished`).
+- Active vs idle time measurement (15s idle threshold by default).
+- File switch counting.
+- Detects new Git commits in the workspace, saves per-file added/modified lines under `github-diffs/` in the repository, and sends diffs to a configured backend API.
+- Sends session-level events to a backend endpoint.
 
-## Requirements
+## What the extension collects
 
-This extension has no external dependencies. It is built using the standard VS Code API and Node.js file system modules which are included with VS Code.
+For each session the extension prepares a record including:
 
-## Build and test
+- `session_start_time` and `session_end_time`
+- `active_minutes` and `idle_seconds`
+- `file_switches`
+- the latest commit hash when the session ended
 
-Each time you make changes, run:
+In addition, when a new Git commit is detected, the extension will compute a diff (HEAD~1..HEAD), save added/modified lines to `github-diffs/<file>-diff.txt` inside the repo, and POST the full diff to the configured backend endpoint.
+
+## Data storage and transmission (important)
+
+- Runtime logs are written to a logs directory that is currently hard-coded to:
+
+	D:\\fatigue-detection-data-collector\\logs
+
+	(This path is used by `src/logger.ts` and `src/extension.ts` for error fallback logging.)
+
+- Session data is POSTed to the backend URL defined by the `BACKEND_URL` environment variable (or the default if not provided). The extension constructs a payload and sends it to `${BACKEND_URL}/api/v1/events/` on deactivate.
+
+- By default the code uses the following defaults if no `.env` is provided:
+
+	- USER_ID: e4669eb0-ef12-4be8-81ac-60d14cf3a718
+	- BACKEND_URL: https://webserver-21719250255.asia-south1.run.app
+
+	You can override these by creating a `.env` file at the extension runtime working directory with keys `USER_ID` and `BACKEND_URL`.
+
+Privacy note: session metrics and diffs may be sent to the configured backend. If you plan to run this extension, review the backend URL and USER_ID configuration and only use endpoints you trust.
+
+## Prerequisites
+
+- Node.js (LTS recommended)
+- VS Code (for running and debugging the extension)
+
+## Development: build and run
+
+1. Install dependencies:
+
+```bash
+npm install
 ```
+
+2. Compile once:
+
+```bash
 npm run compile
 ```
-Or enable auto-compile by running:
-```
+
+3. Or run the TypeScript watcher while developing:
+
+```bash
 npm run watch
 ```
-Then press F5 in VS Code to launch and test the extension.
 
-## Extension Settings
+4. Press F5 in VS Code to launch an Extension Development Host and test the extension.
 
-This extension does not contribute any user-configurable settings through the `contributes.configuration` point. Its behavior is fixed and designed for automated data collection.
+## Useful commands contributed by the extension
 
-## Known Issues
+- `Fatigue Detection: Show Stats` (`fatigueDetectionDataCollector.showStats`) — shows current session metrics in a VS Code info message.
+- `Fatigue Detection: Create New Task` (`fatigueDetectionDataCollector.createNewTask`) — prompts for a task title and creates a task via the backend API.
 
-Currently, there are no known issues. If you encounter any problems, please open an issue on the project's repository.
+## Configuration / .env
 
-## Release Notes
+Create a `.env` file to override defaults (optional). Example:
 
-### 1.0.0
-Initial release of the Fatigue Detection Data Collector.
-- Implemented core logic for tracking active time, idle time, and file switches.
-- Added session-based data logging to a local JSON Lines file.
-- Included a command `fatigueDetectionDataCollector.showStats` for viewing current session metrics.
+```
+USER_ID=your-user-id
+BACKEND_URL=https://your-backend.example.com
+```
+
+Note: The current implementation reads environment variables via `dotenv` at runtime. When debugging from VS Code, ensure your environment or the debug launch configuration supplies these variables.
+
+## Developer notes / TODOs
+
+- The log directory path is currently hard-coded to `D:\\fatigue-detection-data-collector\\logs`. Consider making this path configurable or using the extension global storage path (via the `ExtensionContext`) for better portability.
+- The extension attempts to call `git` in the workspace root; it will disable Git-related features if `.git/HEAD` is not present or if `git` is not available.
+
+## Tests
+
+Run tests (the project compiles first via `pretest`):
+
+```bash
+npm test
+```
+
+## Contributing
+
+Contributions are welcome. Please open an issue or a PR on the repository: https://github.com/Armaan-Indani/fatigue-detection-data-collector
+
+## License
+
+MIT
+
+## Contact
+
+Project maintainer: Armaan Indani (see the GitHub repo for contact links)
