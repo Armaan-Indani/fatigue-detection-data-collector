@@ -8,7 +8,7 @@ import * as dotenv from "dotenv";
 
 dotenv.config();
 
-const USER_ID = process.env.USER_ID ?? "e4669eb0-ef12-4be8-81ac-60d14cf3a718";
+const USER_ID = process.env.USER_ID ?? "d402ac71-9808-44ae-8fcc-8a1a4df8b1e5";
 const BACKEND_URL =
   process.env.BACKEND_URL ??
   "https://webserver-21719250255.asia-south1.run.app";

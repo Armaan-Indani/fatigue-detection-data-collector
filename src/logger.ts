@@ -11,7 +11,7 @@ if (!fs.existsSync(LOG_DIR)) {
 }
 
 const LOG_FILE = path.join(LOG_DIR, "extension.log");
-const ERROR_LOG_FILE = path.join(LOG_DIR, "extension.log");
+const ERROR_LOG_FILE = path.join(LOG_DIR, "extension-error.log");
 
 function formatArgs(args: any[]) {
   return args
